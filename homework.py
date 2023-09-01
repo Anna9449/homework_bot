@@ -44,7 +44,7 @@ def check_tokens():
 
 
 def send_message(bot, message):
-    """"Отправляем сообщение в Telegram чат."""
+    """Отправляем сообщение в Telegram чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except Exception as error:
@@ -58,7 +58,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    """"Отправляем запрос к эндпоинту API-сервиса."""
+    """Отправляем запрос к эндпоинту API-сервиса."""
     try:
         response = requests.get(
             ENDPOINT,
@@ -79,7 +79,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-    """"Проверяем ответ API на наличие ключа 'homeworks'."""
+    """Проверяем ответ API на наличие ключа 'homeworks'."""
     try:
         homeworks = response['homeworks']
     except KeyError:
@@ -91,7 +91,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """"Получаем статус домашней работы."""
+    """Получаем статус домашней работы."""
     try:
         homework_name = homework['homework_name']
     except Exception:

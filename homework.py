@@ -1,11 +1,11 @@
 import logging
 import os
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
 from dotenv import load_dotenv
-from http import HTTPStatus
 
 load_dotenv()
 
@@ -26,21 +26,20 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверяем наличие обязательных переменных окружения."""
-    token_dict = (
+    tokens = (
         ('PRACTICUM_TOKEN', PRACTICUM_TOKEN),
         ('TELEGRAM_TOKEN', TELEGRAM_TOKEN),
         ('TELEGRAM_CHAT_ID', TELEGRAM_CHAT_ID)
     )
     available = True
-    for name, value in token_dict:
+    for name, value in tokens:
         if not value:
             available = False
             logging.critical(
                 f'Отсутствует обязательная переменная окружения: {name}.'
             )
     if not available:
-        ValueError('Программа принудительно остановлена.')
-        exit()
+        raise ValueError('Программа принудительно остановлена.')
 
 
 def send_message(bot, message):
@@ -64,30 +63,35 @@ def send_message(bot, message):
 
 def get_api_answer(timestamp):
     """Отправляем запрос к эндпоинту API-сервиса."""
-    params_dict = {
+    params_for_get_api = {
         'url': ENDPOINT,
         'headers': HEADERS,
         'params': {'from_date': timestamp}
     }
     logging.debug(
-        'Начинаем отправлять запрос к эндпоинту API-сервиса.'
+        f'Начинаем отправлять запрос к эндпоинту API-сервиса:'
+        f' {params_for_get_api.get("url")}.'
+        f' С параметрами: {params_for_get_api.get("headers")},'
+        f' {params_for_get_api.get("params")}.'
     )
-    url, headers, params = [* params_dict.values()]
     try:
         response = requests.get(
-            url,
-            headers=headers,
-            params=params
+            params_for_get_api.get('url'),
+            headers=params_for_get_api.get('headers'),
+            params=params_for_get_api.get('params')
         )
         if response.status_code != HTTPStatus.OK:
             raise requests.exceptions.InvalidResponseCode(
                 logging.error(
-                    f'Эндпоинт {url} недоступен - {response.text}'
+                    f'Эндпоинт {response.url} недоступен - {response.text}'
                     f' Код ответа API: {response.status_code}.'
                 )
             )
     except requests.exceptions.RequestException as error:
-        (f'Эндпоинт {url} недоступен. - {error}')
+        (f'Эндпоинт {params_for_get_api.get("url")}'
+         f' c параметрами: {params_for_get_api.get("headers")},'
+         f' {params_for_get_api.get("params")} -'
+         f' недоступен. - {error}')
     return response.json()
 
 
@@ -101,7 +105,7 @@ def check_response(response):
             logging.error('Ответ API ожидается в формате словаря.')
         )
     if 'homeworks' not in response:
-        raise requests.exceptions.EmptyResponseFromAPI(
+        raise Exception(
             logging.error(
                 'Отсутствует ожидаемый ключ "homeworks" в ответе API.'
             )
@@ -134,7 +138,7 @@ def parse_status(homework):
         )
     status = homework.get('status')
     if status not in HOMEWORK_VERDICTS:
-        raise KeyError(
+        raise ValueError(
             logging.error('Неопознанный статус - {status}')
         )
     verdict = HOMEWORK_VERDICTS.get(status)
@@ -152,25 +156,28 @@ def main():
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            if not homeworks:
-                raise ValueError(
-                    logging.error('У вас нет домашних работ:(')
-                )
-            homework = homeworks[0]
-            status = parse_status(homework)
-            current_report = status
+            if homeworks:
+                homework = homeworks[0]
+                status = parse_status(homework)
+                current_report = status
             if current_report != prev_report:
                 if send_message(bot, status):
                     prev_report = current_report
+                    timestamp = response.get('current_date')
             else:
                 logging.debug(
                     'Нет новых статусов.'
                 )
+
         except requests.exceptions.EmptyResponseFromAPI as error:
             logging.error(f'Пустой ответ от API - {error}')
         except Exception as error:
-            logging.error(f'Сбой в работе программы: {error}')
-            exit()
+            message = f'Сбой в работе программы: {error}'
+            current_report = message
+            logging.error(message)
+            if current_report != prev_report:
+                if send_message(bot, current_report):
+                    prev_report = current_report
         finally:
             time.sleep(RETRY_PERIOD)
 
@@ -181,10 +188,8 @@ if __name__ == '__main__':
                 ' -  %(message)s'),
         level=logging.INFO
     )
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
     handler_term = logging.StreamHandler()
-    handler_file = logging.FileHandler(__file__ + '.log')
-    logger.addHandler(handler_term)
-    logger.addHandler(handler_file)
+    handler_file = logging.FileHandler(__file__ + '.log', encoding='utf-8')
+    logging.addHandler(handler_term)
+    logging.addHandler(handler_file)
     main()

@@ -183,15 +183,12 @@ def main():
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger('log')
-    logger.setLevel(logging.INFO)
-    fmtstr = ('%(asctime)s  [%(levelname)s] - (%(funcName)s(%(lineno)d)'
-              ' -  %(message)s')
     handler_term = logging.StreamHandler()
     handler_file = logging.FileHandler(__file__ + '.log', encoding='utf-8')
-    formatter = logging.Formatter(fmtstr)
-    handler_term.setFormatter(formatter)
-    handler_file.setFormatter(formatter)
-    logger.addHandler(handler_term)
-    logger.addHandler(handler_file)
+    logging.basicConfig(
+        format=('%(asctime)s  [%(levelname)s] - (%(funcName)s(%(lineno)d)'
+                ' -  %(message)s'),
+        level=logging.INFO,
+        handlers=[handler_term, handler_file]
+    )
     main()
